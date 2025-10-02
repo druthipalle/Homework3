@@ -1,0 +1,139 @@
+---
+title: "Should We Redesign the Website? A Data-Driven Recommendation"
+author: "Druthi Palle"
+date: "2025-10-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+library(tidyverse)
+library(readr)
+library(broom)
+library(colorfindr)
+library(scales)
+
+set.seed(375)
+```
+
+```{r}
+# load data + eda
+data <- read_csv("homework3_data.csv",
+                 col_types = cols(
+                   sales  = col_double(),
+                   design = col_double(),
+                   items  = col_double(),
+                   nps    = col_double()
+                 )) %>%
+  mutate(
+    design = factor(design, levels = c(0, 1), labels = c("Old", "New"))
+  )
+
+summary(select(data, sales, items, nps))
+```
+```{r}
+# extract Netflix brand colors
+netflix_logo <- "netflix.png"
+
+colors <- get_colors(netflix_logo)
+
+netflix_colors_tbl <- colors[order(-colors$col_share), "col_hex"] %>% head(4)
+netflix_colors     <- pull(netflix_colors_tbl, col_hex)
+```
+
+```{r}
+palette_df <- data.frame(
+  color = netflix_colors,
+  x = seq_along(netflix_colors)
+)
+
+ggplot(palette_df, aes(x = factor(x), y = 1, fill = color)) +
+  geom_col() +
+  scale_fill_identity() +
+  labs(title = "Extracted Netflix Color Palette", x = NULL, y = NULL) +
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank()
+  )
+```
+```{r}
+summary_table <- data %>%
+  group_by(design) %>%
+  summarise(
+    n = n(),
+    mean_sales = mean(sales),
+    sd_sales = sd(sales),
+    .groups = "drop"
+  )
+
+summary_table
+```
+So customers on the New website spent \$3.66 more per purchase on average.
+
+```{r}
+t_res <- t.test(sales ~ design, data = data)
+t_res
+```
+The redesign significantly increases sales by about \$3.66 per customer, which is well above the \$1.80 required threshold.
+
+
+### Average Sales By Website Design
+```{r}
+pal_design <- c("Old" = netflix_colors[1],
+                "New" = netflix_colors[2])
+
+ggplot(summary_table, aes(x = design, y = mean_sales, fill = design)) +
+  geom_col(width = 0.6, color = "black", alpha = 0.9) +
+  geom_errorbar(
+    aes(
+      ymin = mean_sales - 1.96 * sd_sales / sqrt(n),
+      ymax = mean_sales + 1.96 * sd_sales / sqrt(n)
+    ),
+    width = 0.15
+  ) +
+  scale_fill_manual(values = pal_design) +
+  labs(
+    title = "Average Sales by Website Design",
+    x = NULL,
+    y = "Mean Sales (USD)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "none")
+```
+
+### NPS vs. Sales by Website Design
+```{r}
+ggplot(data, aes(x = nps, y = sales, color = design)) +
+  geom_jitter(width = 0.2, height = 0, alpha = 0.6, size = 2) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+  scale_color_manual(values = pal_design, labels = c("Old", "New")) +
+  labs(
+    title = "NPS vs. Sales by Website Design",
+    x = "Net Promoter Score (NPS)",
+    y = "Sales (USD)",
+    color = "Design"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+### Recommendation
+
+Based on the comparison, I recommend proceeding with the full website redesign.
+
+Customers interacting with the new site design spent on average **$35.51 per purchase**, compared to **$31.85 on the old design**, for a **net increase of $3.66 per customer**. This difference is **statistically significant** (p < 0.0000000000001), and the **95% confidence interval ranges from $2.78 to $4.55**, which **exceeds the company’s required minimum threshold of $1.80**.
+
+The visualizations demonstrate that customers using the new website consistently spent more per transaction than those using the old version. The bar chart highlights a clear increase in mean sales, while the scatterplot shows that higher customer satisfaction (NPS) is associated with greater sales, with the new design maintaining a stronger slope across all NPS levels. Together, these results support recommending the redesign as it delivers meaningful improvements in customer spending and engagement.
+
+###  Alternative Statement
+
+An alternative perspective is that the redesign does not truly increase sales by the required $1.80 per customer. 
+
+The observed difference in spending may be explained by factors such as customers purchasing more items or reporting higher NPS scores that are unrelated to the layout itself. If this were true, the redesign’s apparent effect on revenue would be overstated, and the company could commit resources to the project without achieving the expected financial return.
+
+
+
+
+
